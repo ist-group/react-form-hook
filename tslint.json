@@ -1,0 +1,10 @@
+{
+  "defaultSeverity": "error",
+  "extends": ["@ist-group/tslint-config"],
+  "jsRules": {},
+  "rules": {
+    "no-submodule-imports": false,
+    "no-empty": false
+  },
+  "rulesDirectory": []
+}
