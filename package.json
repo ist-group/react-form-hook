@@ -1,6 +1,6 @@
 {
   "name": "@ist-group/react-form-hook",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Typed form hooks inspired by formik",
   "main": "dist/index.js",
   "author": "Henrik Cooke <henrik@cooke.se>",
@@ -13,7 +13,8 @@
   },
   "peerDependencies": {},
   "files": [
-    "./dist"
+    "./dist",
+    "./README.md"
   ],
   "types": "./dist/index.d.ts",
   "dependencies": {

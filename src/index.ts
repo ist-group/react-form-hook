@@ -37,11 +37,14 @@ type ConditionalFormField<TState> = TState extends object[]
   ? PrimitiveFormField<boolean> // Workaround for https://github.com/Microsoft/TypeScript/issues/30029
   : PrimitiveFormField<TState>;
 
-export interface FormState<TState> {
+export interface ReadFormState<TState> {
   fields: ComplexFormField<TState>;
   submitting: boolean;
-  submit: () => void;
   disabled: boolean;
+}
+
+export interface FormState<TState> extends ReadFormState<TState> {
+  submit: () => void;
   reset: (newInitialValue?: TState) => void;
 }
 
@@ -59,7 +62,7 @@ type FieldValidation<TState> =
     }
   | undefined;
 
-type SubmitFunc<TState> = (state: TState) => Promise<any>;
+export type SubmitFunc<TState> = (state: TState) => Promise<any>;
 
 function extractFormFieldValues(field: FormField<any>): any {
   return visitFormFields(field, {
@@ -149,12 +152,14 @@ function containsError(field: FormField<any>): any {
   }
 }
 
+export interface FormOptions<TState> {
+  fieldValidation?: FieldValidation<TState>;
+  submit: SubmitFunc<TState>;
+}
+
 export function useForm<TState extends object>(
   initState: TState,
-  options: {
-    fieldValidation?: FieldValidation<TState>;
-    submit: SubmitFunc<TState>;
-  }
+  options: FormOptions<TState>
 ): FormState<TState> {
   const stateRef = React.useRef<FormState<TState>>();
   const submitRef = React.useRef<SubmitFunc<TState>>();
