@@ -11,7 +11,9 @@
     "@types/react": "^16.9.2",
     "typescript": "^3.6.2"
   },
-  "peerDependencies": {},
+  "peerDependencies": {
+    "react": "^16.9.0"
+  },
   "files": [
     "./dist"
   ],
