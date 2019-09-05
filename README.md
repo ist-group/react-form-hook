@@ -1,34 +1,42 @@
-== React forms without hassle ==
+# React forms without hassle
 
 ## Example
 
-```typescript
-const form = useForm(
-  {
-    id: "",
-    name: "",
-    description: "",
-    children: [{ name: "" }]
-  },
-  {
-    fieldValidation: {
-      id: id => (!id ? "Id is an required field" : undefined),
-      children: {
-        name: name => (!name ? "Name is required" : undefined)
-      }
-    },
-    submit: values => createWithApi({ input: stripCreateVendorInput(values) })
-  }
-);
+```tsx
+const MyTextComponent = ({ field, ...innerProps }) => {
+  return (
+    <Input value={field.value} onChange={field.handleChange} {...innerProps} className={field.error ? "error" : ""} />
+  );
+};
 
-return (
-  <form>
-    <MyTextComponent field={form.fields.id} />
-    <MyTextComponent field={form.fields.name} />
-    <MyTextComponent field={form.fields.description} />
-    <MyChildrenComponent field={form.fields.children} />
-  </form>
-);
+const FormComponent = () => {
+  const form = useForm(
+    {
+      id: "",
+      name: "",
+      description: "",
+      children: [{ name: "" }],
+    },
+    {
+      fieldValidation: {
+        id: id => (!id ? "Id is an required field" : undefined),
+        children: {
+          name: name => (!name ? "Name is required" : undefined),
+        },
+      },
+      submit: values => doSomething(values),
+    },
+  );
+
+  return (
+    <form>
+      <MyTextComponent field={form.fields.id} />
+      <MyTextComponent field={form.fields.name} />
+      <MyTextComponent field={form.fields.description} />
+      <MyChildrenComponent field={form.fields.children} />
+    </form>
+  );
+};
 ```
 
 ## API reference
@@ -49,3 +57,4 @@ TODO when interface is stable
 - No cancelation of async validation
 - Only basic array manipulation supported (push and remove) (implement more when needed)
 - No pre-bundled helper components to render fields (formik has it, but it may not be needed)
+- No pre-bundled helper components to render validation errors (formik has it, but it may not be needed)
