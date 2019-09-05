@@ -4,9 +4,9 @@
 
 ```tsx
 const MyTextComponent = ({ field, ...innerProps }) => {
-  const changeCallback = useCallback(ev => callbackFunction(ev.target.value), [field.set]);
-
-  return <Input value={field.value} onChange={changeCallback} {...innerProps} className={field.error ? "error" : ""} />;
+  return (
+    <Input value={field.value} onChange={field.handleChange} {...innerProps} className={field.error ? "error" : ""} />
+  );
 };
 
 const FormComponent = () => {
