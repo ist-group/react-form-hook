@@ -65,23 +65,23 @@ function extractFormFieldValues(field: FormField<any>): any {
   return visitFormFields(field, {
     array: x => x.array.map(extractFormFieldValues),
     complex: x => _.mapValues(x, extractFormFieldValues),
-    primitive: x => x.value
+    primitive: x => x.value,
   });
 }
 
 function mapFormFields(
   field: FormField<any>,
-  updater: (prev: PrimitiveFormField<any>) => PrimitiveFormField<any>
+  updater: (prev: PrimitiveFormField<any>) => PrimitiveFormField<any>,
 ): any {
   return visitFormFields(field, {
     array: x => ({
       ...x,
-      array: x.array.map(item => mapFormFields(item, updater))
+      array: x.array.map(item => mapFormFields(item, updater)),
     }),
     complex: x => ({
-      ..._.mapValues(x, innerField => mapFormFields(innerField, updater))
+      ..._.mapValues(x, innerField => mapFormFields(innerField, updater)),
     }),
-    primitive: y => updater(y)
+    primitive: y => updater(y),
   });
 }
 
@@ -89,7 +89,7 @@ function validateFields(field: FormField<any>, validators: any): any {
   return visitFormFields(field, {
     array: x => x.array.map(item => validateFields(item, validators)),
     complex: x => _.mapValues(x, (innerField, key) => validateFields(innerField, validators && validators[key])),
-    primitive: innerField => (validators ? validators(innerField.value) : undefined)
+    primitive: innerField => (validators ? validators(innerField.value) : undefined),
   });
 }
 
@@ -97,18 +97,18 @@ async function mergeInValidationResults(field: FormField<any>, validationResults
   return visitFormFields(field, {
     array: async x => ({
       ...x,
-      array: await Promise.all(x.array.map((item, index) => mergeInValidationResults(item, validationResults[index])))
+      array: await Promise.all(x.array.map((item, index) => mergeInValidationResults(item, validationResults[index]))),
     }),
     complex: async x =>
       Promise.all(
         Object.keys(x).map(async key =>
-          mergeInValidationResults((x as any)[key], validationResults ? validationResults[key] : undefined)
-        )
+          mergeInValidationResults((x as any)[key], validationResults ? validationResults[key] : undefined),
+        ),
       ).then((res: any) => _.fromPairs(Object.keys(x).map((key, index) => [key, res[index]]))),
     primitive: async innerField => ({
       ...innerField,
-      error: await validationResults
-    })
+      error: await validationResults,
+    }),
   });
 }
 
@@ -143,10 +143,7 @@ export interface FormOptions<TState> {
   submit: SubmitFunc<TState>;
 }
 
-export function useForm<TState extends object>(
-  initState: TState,
-  options: FormOptions<TState>
-): FormState<TState> {
+export function useForm<TState extends object>(initState: TState, options: FormOptions<TState>): FormState<TState> {
   const stateRef = React.useRef<FormState<TState>>();
   const submitRef = React.useRef<SubmitFunc<TState>>();
 
@@ -164,7 +161,7 @@ export function useForm<TState extends object>(
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
-          fields: createComplexFormField(newState || initState, options.fieldValidation, fieldsUpdater)
+          fields: createComplexFormField(newState || initState, options.fieldValidation, fieldsUpdater),
         })),
       submit: async () => {
         if (stateRef.current!.submitting) {
@@ -183,10 +180,10 @@ export function useForm<TState extends object>(
             fields: mapFormFields(currentState.fields, field => ({
               ...field,
               disabled: true,
-              touched: true
+              touched: true,
             })),
             disabled: true,
-            submitting: true
+            submitting: true,
           });
 
           // Start field validation in parallell
@@ -197,7 +194,7 @@ export function useForm<TState extends object>(
           // Await and merge all validation results into the fields
           currentState = updateState({
             ...currentState,
-            fields: await mergeInValidationResults(currentState.fields, valResults)
+            fields: await mergeInValidationResults(currentState.fields, valResults),
           });
 
           // Submit if no error
@@ -209,13 +206,13 @@ export function useForm<TState extends object>(
             ...prev,
             fields: mapFormFields(prev.fields, field => ({
               ...field,
-              disabled: false
+              disabled: false,
             })),
             disabled: false,
-            submitting: false
+            submitting: false,
           }));
         }
-      }
+      },
     };
   });
 
@@ -234,7 +231,7 @@ export function useForm<TState extends object>(
 function createFormField<TValue>(
   initValue: TValue,
   fieldValidation: FieldValidation<TValue>,
-  setter: (updater: (prev: FormField<TValue>) => FormField<TValue>) => void
+  setter: (updater: (prev: FormField<TValue>) => FormField<TValue>) => void,
 ): FormField<TValue> {
   if (_.isArray(initValue)) {
     return createArrayFormField(initValue, fieldValidation as any, setter as any) as any;
@@ -249,7 +246,7 @@ function createFormField<TValue>(
 function createArrayFormField<TValue extends any[]>(
   initValue: TValue,
   fieldValidation: FieldValidation<TValue>,
-  setter: (updater: (prev: ArrayFormField<TValue>) => ArrayFormField<TValue>) => void
+  setter: (updater: (prev: ArrayFormField<TValue>) => ArrayFormField<TValue>) => void,
 ): ArrayFormField<TValue> {
   const createFormFieldInArray = (val: any, index: number) =>
     createFormField(
@@ -259,9 +256,9 @@ function createArrayFormField<TValue extends any[]>(
         setter(prev => ({
           ...prev,
           array: prev.array.map((prevValue: any, prevIndex) =>
-            index === prevIndex ? updater(prevValue) : prevValue
-          ) as any
-        })) as any
+            index === prevIndex ? updater(prevValue) : prevValue,
+          ) as any,
+        })) as any,
     ) as any;
 
   return {
@@ -271,30 +268,30 @@ function createArrayFormField<TValue extends any[]>(
     push: (newEntry: TValue[0]) =>
       setter(prev => ({
         ...prev,
-        array: prev.array.concat([createFormFieldInArray(newEntry, prev.array.length)])
-      })) as any
+        array: prev.array.concat([createFormFieldInArray(newEntry, prev.array.length)]),
+      })) as any,
   };
 }
 
 function createComplexFormField<TValue extends object>(
   initValue: TValue,
   fieldValidation: FieldValidation<TValue>,
-  setter: (updater: (prev: ComplexFormField<TValue>) => ComplexFormField<TValue>) => void
+  setter: (updater: (prev: ComplexFormField<TValue>) => ComplexFormField<TValue>) => void,
 ): ComplexFormField<TValue> {
   return _.mapValues(initValue, (val, key) =>
     createFormField(val, (fieldValidation || ({} as any))[key], updater =>
       setter(prev => ({
         ...prev,
-        [key]: updater((prev as any)[key])
-      }))
-    )
+        [key]: updater((prev as any)[key]),
+      })),
+    ),
   ) as any;
 }
 
 function createPrimitiveFormField<TValue>(
   initValue: TValue,
   validate: FieldValidateFunc<TValue> | undefined,
-  setter: (updater: (prev: PrimitiveFormField<TValue>) => PrimitiveFormField<TValue>) => void
+  setter: (updater: (prev: PrimitiveFormField<TValue>) => PrimitiveFormField<TValue>) => void,
 ): PrimitiveFormField<TValue> {
   const executeValidation = (newValue: TValue) => {
     const valResult: any = validate ? validate(newValue) : undefined;
@@ -303,10 +300,10 @@ function createPrimitiveFormField<TValue>(
       // TODO: cancellation and debouce support
       valResult
         .then((res: any) =>
-          setter(prev => (newValue === prev.value ? { ...prev, error: res, validating: false } : prev))
+          setter(prev => (newValue === prev.value ? { ...prev, error: res, validating: false } : prev)),
         )
         .catch(() =>
-          setter(prev => (newValue === prev.value ? { ...prev, error: "Validation failed", validating: false } : prev))
+          setter(prev => (newValue === prev.value ? { ...prev, error: "Validation failed", validating: false } : prev)),
         );
 
       return { validating: true };
@@ -319,7 +316,7 @@ function createPrimitiveFormField<TValue>(
     setter(prev => ({
       ...prev,
       value: newValue,
-      ...executeValidation(newValue)
+      ...executeValidation(newValue),
     }));
 
   return {
@@ -335,7 +332,7 @@ function createPrimitiveFormField<TValue>(
       setter(prev => ({
         ...prev,
         touched: true,
-        ...executeValidation(prev.value)
-      }))
+        ...executeValidation(prev.value),
+      })),
   };
 }
