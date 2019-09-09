@@ -5,7 +5,14 @@
 ```tsx
 const MyTextComponent = ({ field, ...innerProps }) => {
   return (
-    <Input value={field.value} onChange={field.handleChange} {...innerProps} className={field.error ? "error" : ""} />
+    <Input
+      value={field.value}
+      disabled={field.disabled}
+      onBlur={field.handleBlur}
+      onChange={field.handleChange}
+      {...innerProps}
+      className={field.error && field.touched ? "error" : ""}
+    />
   );
 };
 
