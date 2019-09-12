@@ -26,12 +26,13 @@ export interface ArrayFormField<TState> {
 
 export type FormField<TValue> = PrimitiveFormField<TValue> | ComplexFormField<TValue> | ArrayFormField<TValue>;
 
-type ConditionalFormField<TState> = TState extends object[]
+// Special care to not distribute union types: https://github.com/Microsoft/TypeScript/issues/29368
+type ConditionalFormField<TState> = [TState] extends [object[]]
   ? ArrayFormField<TState[0]>
+  : [TState] extends [string | null | number | undefined | boolean]
+  ? PrimitiveFormField<TState>
   : TState extends object
   ? ComplexFormField<TState>
-  : TState extends boolean
-  ? PrimitiveFormField<boolean> // Workaround for https://github.com/Microsoft/TypeScript/issues/30029
   : PrimitiveFormField<TState>;
 
 export interface ReadFormState<TState> {
