@@ -3,14 +3,18 @@ import * as _ from "lodash";
 
 export interface PrimitiveFormField<TValue> {
   type: "primitive";
+  props: {
+    name: string;
+    disabled: boolean;
+    onChange: (ev: React.ChangeEvent<any>) => void;
+    onBlur: () => void;
+  };
   value: TValue;
+  path: Array<string | number>;
   touched: boolean;
   error: string | undefined | null;
-  disabled: boolean;
   validating: boolean;
   set: (val: TValue) => void;
-  handleChange: (ev: React.ChangeEvent<any>) => void;
-  handleBlur: () => void;
 }
 
 export type ComplexFormField<TState> = {
@@ -49,6 +53,7 @@ export interface FormState<TState> extends ReadFormState<TState> {
 type FieldValidationResult = string | undefined | null | Promise<string | undefined | null>;
 
 type FieldValidateFunc<TValue> = (val: TValue) => FieldValidationResult;
+type ObjectIterator<TObject, TResult> = (value: TObject[keyof TObject], key: string, collection: TObject) => TResult;
 
 type FieldValidation<TState> =
   | {
@@ -156,13 +161,13 @@ export function useForm<TState extends object>(initState: TState, options: FormO
       setState(prev => ({ ...prev, fields: updater(prev.fields) }));
 
     return {
-      fields: createComplexFormField(initState, options.fieldValidation, fieldsUpdater),
+      fields: createComplexFormField(initState, [], options.fieldValidation, fieldsUpdater),
       disabled: false,
       submitting: false,
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
-          fields: createComplexFormField(newState || initState, options.fieldValidation, fieldsUpdater),
+          fields: createComplexFormField(newState || initState, [], options.fieldValidation, fieldsUpdater),
         })),
       submit: async () => {
         if (stateRef.current!.submitting) {
@@ -231,27 +236,30 @@ export function useForm<TState extends object>(initState: TState, options: FormO
 
 function createFormField<TValue>(
   initValue: TValue,
+  path: Array<string | number>,
   fieldValidation: FieldValidation<TValue>,
   setter: (updater: (prev: FormField<TValue>) => FormField<TValue>) => void,
 ): FormField<TValue> {
   if (_.isArray(initValue)) {
-    return createArrayFormField(initValue, fieldValidation as any, setter as any) as any;
+    return createArrayFormField(initValue, path, fieldValidation as any, setter as any) as any;
     // Consider null to be a primitive field
   } else if (typeof initValue === "object" && initValue !== null) {
-    return createComplexFormField(initValue as any, fieldValidation, setter as any);
+    return createComplexFormField(initValue as any, path, fieldValidation, setter as any);
   } else {
-    return createPrimitiveFormField(initValue, fieldValidation as any, setter as any);
+    return createPrimitiveFormField(initValue, path, fieldValidation as any, setter as any);
   }
 }
 
 function createArrayFormField<TValue extends any[]>(
   initValue: TValue,
+  path: Array<string | number>,
   fieldValidation: FieldValidation<TValue>,
   setter: (updater: (prev: ArrayFormField<TValue>) => ArrayFormField<TValue>) => void,
 ): ArrayFormField<TValue> {
   const createFormFieldInArray = (val: any, index: number) =>
     createFormField(
       val,
+      [...path, index],
       fieldValidation as any,
       updater =>
         setter(prev => ({
@@ -276,11 +284,12 @@ function createArrayFormField<TValue extends any[]>(
 
 function createComplexFormField<TValue extends object>(
   initValue: TValue,
+  path: Array<string | number>,
   fieldValidation: FieldValidation<TValue>,
   setter: (updater: (prev: ComplexFormField<TValue>) => ComplexFormField<TValue>) => void,
 ): ComplexFormField<TValue> {
   return _.mapValues(initValue, (val, key) =>
-    createFormField(val, (fieldValidation || ({} as any))[key], updater =>
+    createFormField(val as any, [...path, key], (fieldValidation || ({} as any))[key], (updater: (val: any) => void) =>
       setter(prev => ({
         ...prev,
         [key]: updater((prev as any)[key]),
@@ -291,6 +300,7 @@ function createComplexFormField<TValue extends object>(
 
 function createPrimitiveFormField<TValue>(
   initValue: TValue,
+  path: Array<string | number>,
   validate: FieldValidateFunc<TValue> | undefined,
   setter: (updater: (prev: PrimitiveFormField<TValue>) => PrimitiveFormField<TValue>) => void,
 ): PrimitiveFormField<TValue> {
@@ -322,18 +332,32 @@ function createPrimitiveFormField<TValue>(
 
   return {
     type: "primitive",
+    props: {
+      name: pathToString(path),
+      disabled: false,
+      onChange: ev => setValue(ev.target.value),
+      onBlur: () =>
+        setter(prev => ({
+          ...prev,
+          touched: true,
+          ...executeValidation(prev.value),
+        })),
+    },
     value: initValue,
+    path,
     touched: false,
     error: undefined,
     validating: false,
-    disabled: false,
-    handleChange: ev => setValue(ev.target.value),
     set: setValue,
-    handleBlur: () =>
-      setter(prev => ({
-        ...prev,
-        touched: true,
-        ...executeValidation(prev.value),
-      })),
   };
+}
+
+function pathToString(path: Array<string | number>): string {
+  const [firstElement, ...theRest] = path;
+  return theRest.reduce(
+    (pathString: string, value: string | number) => {
+      return `${pathString}[${value}]`;
+    },
+    firstElement as string,
+  );
 }
