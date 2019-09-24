@@ -158,8 +158,15 @@ export function useForm<TState extends object>(initState: TState, options: FormO
   let state: FormState<TState>;
 
   [state, setState] = React.useState<FormState<TState>>(() => {
-    const fieldsUpdater = (updater: (fields: ComplexFormField<TState>) => ComplexFormField<TState>) =>
-      setState(prev => ({ ...prev, fields: updater(prev.fields), dirty: true }));
+    const fieldsUpdater = (updater: (fields: ComplexFormField<TState>) => ComplexFormField<TState>) => {
+      setState(prev => {
+        const fields = updater(prev.fields);
+        const dirty = prev.dirty
+          ? true
+          : !_.isEqual(extractFormFieldValues(prev.fields), extractFormFieldValues(fields));
+        return { ...prev, fields, dirty };
+      });
+    };
 
     return {
       fields: createComplexFormField(initState, [], options.fieldValidation, fieldsUpdater),
