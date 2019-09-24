@@ -216,6 +216,10 @@ export function useForm<TState extends object>(initState: TState, options: FormO
           // Submit if no error
           if (!containsError(currentState.fields)) {
             await submitRef.current!(extractFormFieldValues(currentState.fields));
+            setState(prev => ({
+              ...prev,
+              dirty: false,
+            }));
           }
         } finally {
           setState(prev => ({
