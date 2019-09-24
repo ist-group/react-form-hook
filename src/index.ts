@@ -35,7 +35,7 @@ type ConditionalFormField<TState> = [TState] extends [object[]]
   ? ArrayFormField<TState[0]>
   : [TState] extends [string | null | number | undefined | boolean]
   ? PrimitiveFormField<TState>
-  : TState extends object
+  : [TState] extends [object]
   ? ComplexFormField<TState>
   : PrimitiveFormField<TState>;
 
@@ -43,6 +43,7 @@ export interface ReadFormState<TState> {
   fields: ComplexFormField<TState>;
   submitting: boolean;
   disabled: boolean;
+  dirty: boolean;
 }
 
 export interface FormState<TState> extends ReadFormState<TState> {
@@ -158,16 +159,18 @@ export function useForm<TState extends object>(initState: TState, options: FormO
 
   [state, setState] = React.useState<FormState<TState>>(() => {
     const fieldsUpdater = (updater: (fields: ComplexFormField<TState>) => ComplexFormField<TState>) =>
-      setState(prev => ({ ...prev, fields: updater(prev.fields) }));
+      setState(prev => ({ ...prev, fields: updater(prev.fields), dirty: true }));
 
     return {
       fields: createComplexFormField(initState, [], options.fieldValidation, fieldsUpdater),
       disabled: false,
       submitting: false,
+      dirty: false,
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
           fields: createComplexFormField(newState || initState, [], options.fieldValidation, fieldsUpdater),
+          dirty: false,
         })),
       submit: async () => {
         if (stateRef.current!.submitting) {
