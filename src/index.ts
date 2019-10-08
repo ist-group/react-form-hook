@@ -316,7 +316,9 @@ function createPrimitiveFormField<TValue>(
   initValue: TValue,
   path: Array<string | number>,
   validate: FieldValidateFunc<TValue> | undefined,
-  setter: (updater: (prev: PrimitiveFormField<TValue>) => PrimitiveFormField<TValue>) => void,
+  setter: (
+    updater: (prev: PrimitiveFormField<TValue>) => PrimitiveFormField<TValue> | ComplexFormField<TValue & object>,
+  ) => void,
 ): PrimitiveFormField<TValue> {
   const executeValidation = (newValue: TValue) => {
     const valResult: any = validate ? validate(newValue) : undefined;
@@ -337,12 +339,20 @@ function createPrimitiveFormField<TValue>(
     return { error: valResult, validating: false };
   };
 
-  const setValue = (newValue: TValue) =>
-    setter(prev => ({
-      ...prev,
-      value: newValue,
-      ...executeValidation(newValue),
-    }));
+  const setValue = (newValue: TValue) => {
+    setter(prev => {
+      // Tranform a primitive field to a complex fied (prop.field == null => prop.field == {})
+      if ((prev.value === null || prev.value === undefined) && _.isObject(newValue)) {
+        return createComplexFormField(newValue, path, validate as FieldValidation<TValue & object>, setter as any);
+      } else {
+        return {
+          ...prev,
+          value: newValue,
+          ...executeValidation(newValue),
+        };
+      }
+    });
+  };
 
   return {
     type: "primitive",
