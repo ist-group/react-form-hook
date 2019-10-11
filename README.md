@@ -31,18 +31,81 @@ const FormComponent = () => {
 
   return (
     <form>
-      <MyTextComponent field={form.fields.id} />
-      <MyTextComponent field={form.fields.name} />
-      <MyTextComponent field={form.fields.description} />
+      <MyTextComponent field={form.value.id} />
+      <MyTextComponent field={form.value.name} />
+      <MyTextComponent field={form.value.description} />
     </form>
   );
 };
 ```
 
-## Adding a complex object Example
+## Working with arrays
+
+It also works with arrays.
+You can specify individual field validators as well as an validator for the whole array.
 
 ```tsx
+const List = ({ arrayField }) => {
 
+  const addType = (e) => {
+    e.preventDefault();
+    arrayField.push({type: ""})
+  }
+
+  return (
+    <div>
+      <button onClick={addType}>Add a new Type</button>
+      <ul>
+        { arrayField.value.map((val, index) =>
+            <li key={index}>
+              <MyTextComponent field={val} />
+              <button onClick={() => arrayField.remove(index)} />
+            </li>)
+        }
+      </ul>
+    </div>
+  );
+};
+
+const FormComponent = () => {
+  const form = useForm(
+    {
+      id: "",
+      name: "",
+      description: "",
+      listOfObjects: [{type: ""}]
+    },
+    {
+      fieldValidation: {
+        id: id => (!id ? "Id is an required field" : undefined),
+        listOfObjects: {
+          fieldValidation: {
+            type: value => (!value ? "type is required" : undefined),
+          }
+          validate: (list => (list.length > 10 ? "You can max have 10 listOfObjects": undefined))
+        }
+      },
+      submit: values => doSomething(values),
+    },
+  );
+
+  return (
+    <form>
+      <MyTextComponent field={form.value.id} />
+      <MyTextComponent field={form.value.name} />
+      <MyTextComponent field={form.value.description} />
+      <List field={form.value.listOfObjects} />
+    </form>
+  );
+};
+```
+
+## Working with complex object and optional branches
+
+To work with optional sub branches of the form, just add a complex type that can be null.
+Use the .set method on the parent field to add/remove the subform part.
+
+```tsx
 const MyChildrenComponent = ({ complexField }) => {
 
   return (
@@ -60,13 +123,14 @@ const FormComponent = () => {
       id: "",
       name: "",
       description: "",
+      requiredInfo: { foo: "", bar: "", baz: "" }
       extraInfo: null
     },
     {
       fieldValidation: {
         id: id => (!id ? "Id is an required field" : undefined),
-        extraInfo: {
-          value: {
+        requiredInfo: {
+          fieldValidation: {
             foo: value => (!value ? "foo is required" : undefined),
           }
           validate: (values => (!values.bar && !values.baz ? "You need to specify either bar or baz": undefined))
@@ -78,21 +142,23 @@ const FormComponent = () => {
 
   const addExtraInfo = (e) => {
     e.preventDefault();
-    form.fields.extraInfo.set({ foo: "", bar: "", baz: "" });
+    form.value.extraInfo.set({ foo: "", bar: "", baz: "" });
   }
 
   return (
     <form>
-      <MyTextComponent field={form.fields.id} />
-      <MyTextComponent field={form.fields.name} />
-      <MyTextComponent field={form.fields.description} />
-      { form.fields.extraInfo.value
-        ? <MyChildrenComponent field={form.fields.extraInfo.value} />
+      <MyTextComponent field={form.value.id} />
+      <MyTextComponent field={form.value.name} />
+      <MyTextComponent field={form.value.description} />
+      <MyChildrenComponent field={form.value.requiredInfo.value} />
+      { form.value.extraInfo.value
+        ? <MyChildrenComponent field={form.value.extraInfo.value} />
         : <button onClick={addExtraInfo}>Add Extra Info</button>
       }
     </form>
   );
 };
+```
 
 ## API reference
 
@@ -105,7 +171,7 @@ TODO when interface is stable
 ## Limitations and todos
 
 - Lodash is required (should probably be removed, most its mapValues that is used)
-- No form level validation (should be implemented when needed)
+- ~~No form level validation (should be implemented when needed)~~
 - No opiniated way of doing validation (could perhaps support yoi out of the box but without a dependency)
 - Arrays must not be used as tuples (same type is assumed on all indexes)
 - No debouncing on async validation (should probably be implemented)
@@ -113,4 +179,7 @@ TODO when interface is stable
 - Only basic array manipulation supported (push and remove) (implement more when needed)
 - No pre-bundled helper components to render fields (formik has it, but it may not be needed)
 - No pre-bundled helper components to render validation errors (formik has it, but it may not be needed)
+
+```
+
 ```
