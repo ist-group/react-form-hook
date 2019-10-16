@@ -1,5 +1,4 @@
 import * as React from "react";
-import * as _ from "lodash";
 
 interface FormField {
   path: Array<string | number>;
@@ -43,17 +42,13 @@ export type ConditionalFormField<TState> = [TState] extends [any[]]
   ? ComplexFormField<TState>
   : PrimitiveFormField<TState>;
 
-export interface ReadFormState<TState extends object> {
-  value: FormObject<TState>;
-  submitting: boolean;
-  disabled: boolean;
-  dirty: boolean;
-}
-
-export interface FormState<TState extends object> extends ReadFormState<TState> {
+export interface ReadFormState<TState> {
   submit: () => void;
   reset: (newInitialValue?: TState) => void;
+  submitting: boolean;
 }
+
+export type FormState<TState> = ConditionalFormField<TState> & ReadFormState<TState>;
 
 interface ObjectFieldValidation<TState> {
   fieldValidation?: FieldValidation<TState>;
@@ -81,107 +76,122 @@ type FieldValidation<TState> =
 
 export type SubmitFunc<TState> = (state: TState) => Promise<any>;
 
-function extractFormFieldValuesObject<TState extends {}>(values: FormObject<TState>) {
-  return _.mapValues(values, extractFormFieldValues);
+function mapValues<T extends object, TResult>(
+  obj: T,
+  callback: (value: T[keyof T], key: string) => TResult,
+): { [P in keyof T]: TResult } {
+  return Object.keys(obj).reduce(
+    (acc, key: string) => ({ ...acc, [key]: callback(obj[key as keyof T], key) }),
+    {} as any,
+  );
 }
 
-function extractFormFieldValues(field: any): any {
+function extractFormFieldValues<T, U extends ConditionalFormField<T>>(field: U): T {
   return visitFormFields(field, {
-    array: x => x.value.map(extractFormFieldValues),
-    complex: x => _.mapValues(x.value, extractFormFieldValues),
-    primitive: x => x.value,
+    array: x => x.value.map(extractFormFieldValues as any),
+    complex: x => mapValues(x.value, extractFormFieldValues as any),
+    primitive: (x: PrimitiveFormField<T>) => x.value,
   });
 }
 
-function mapFormFields<TValue>(
-  field: TValue,
+function mapFormFields<TValue, F extends ConditionalFormField<TValue>>(
+  field: F,
   updater: (prev: PrimitiveFormField<any>) => PrimitiveFormField<any>,
 ): TValue {
   return visitFormFields(field, {
-    array: x => ({
+    array: (x: ArrayFormField<TValue & any[]>) => ({
       ...x,
       value: x.value.map((item: any) => mapFormFields(item, updater)),
     }),
-    complex: x => ({
+    complex: (x: ComplexFormField<TValue & {}>) => ({
       ...x,
-      value: _.mapValues(x.value, innerField => mapFormFields(innerField as any, updater)),
+      value: mapValues(x.value, innerField => mapFormFields(innerField as any, updater)),
     }),
-    primitive: y => updater(y),
+    primitive: (y: PrimitiveFormField<TValue>) => updater(y),
   });
 }
 
-function validateFields<TValue>(field: ConditionalFormField<TValue>, validators: any): ConditionalFormField<TValue> {
-  return visitFormFields(field, {
-    array: x => x.value.map((item: any) => validateFields(item as any, validators && validators.fieldValidation)),
-    complex: x =>
-      _.mapValues(x.value, (innerField, key) =>
-        validateFields(innerField as any, validators && validators.fieldValidation && validators.fieldValidation[key]),
-      ),
-    primitive: innerField =>
-      validators && validators.fieldValidation ? validators.fieldValidation(innerField.value) : undefined,
-  });
-}
-async function mergeInValidationResultsObject<TState extends object>(
-  fields: FormObject<TState>,
-  validationResults: any,
-): Promise<any> {
-  return Promise.all(
-    Object.keys(fields).map(async key =>
-      mergeInValidationResults((fields as any)[key], validationResults ? validationResults[key] : undefined),
-    ),
-  ).then((res: any) => _.fromPairs(Object.keys(fields).map((key, index) => [key, res[index]])));
-}
-
-async function mergeInValidationResults(field: ConditionalFormField<any>, validationResults: any): Promise<any> {
-  return visitFormFields(field, {
-    array: async x => ({
-      ...x,
-      value: await Promise.all(
-        x.value.map((item: ConditionalFormField<any>, index: string | number) =>
-          mergeInValidationResults(item, validationResults.value[index]),
-        ),
-      ),
-      error: await validationResults,
-    }),
-    complex: async x => ({
-      ...x,
-      value: await mergeInValidationResultsObject(x.value, validationResults),
-      error: await validationResults,
-    }),
-    primitive: async innerField => ({
-      ...innerField,
-      error: await validationResults,
-    }),
-  });
-}
-
-interface Visitor {
-  array: (field: ArrayFormField<any>) => any;
-  complex: (field: ComplexFormField<any>) => any;
-  primitive: (field: PrimitiveFormField<any>) => any;
-}
-
-function visitFormFields<TValue>(field: any, visitor: Visitor): any {
-  if (field.type === "array") {
-    return visitor.array(field);
-  } else if (field.type === "primitive") {
-    return visitor.primitive(field);
-  } else {
-    return visitor.complex(field);
+async function validateValue<TValue, TState extends ConditionalFormField<TValue>>(
+  value: TState,
+  validator?: ObjectFieldValidation<TValue> | ArrayFieldValidation<TValue & any[]> | FieldValidateFunc<TValue>,
+) {
+  if (!validator) {
+    return;
+  }
+  if (typeof validator === "function") {
+    return validator(extractFormFieldValues(value));
+  } else if (validator.validation) {
+    return validator.validation(extractFormFieldValues(value as any));
   }
 }
 
-function complexFieldContainsError<TValue extends object>(fields: FormObject<TValue>): boolean {
-  return Object.keys(fields).some(key => containsError((fields as any)[key] as any));
+async function mergeInValidationResults<TValue, TField extends ConditionalFormField<TValue>>(
+  field: TField,
+  validators?: ObjectFieldValidation<TValue> | ArrayFieldValidation<TValue & any[]> | FieldValidateFunc<TValue>,
+): Promise<any> {
+  return visitFormFields<TValue, TField>(field, {
+    array: async x => ({
+      ...x,
+      value: await Promise.all(
+        x.value.map(item =>
+          mergeInValidationResults(
+            item as any,
+            typeof validators === "object" && validators.fieldValidation
+              ? (validators.fieldValidation as any)
+              : undefined,
+          ),
+        ),
+      ),
+      error: await validateValue(x as any, validators),
+    }),
+    complex: async x => ({
+      ...x,
+      value: await Promise.all(
+        Object.keys(x.value).map(async key => [
+          key,
+          await mergeInValidationResults(
+            (x.value as any)[key],
+            typeof validators === "object" && validators.fieldValidation
+              ? (validators.fieldValidation as any)[key]
+              : undefined,
+          ),
+        ]),
+      ).then((res: any) => res.reduce((acc: any, [key, value]: any) => ({ ...acc, [key]: value }), {})),
+      error: await validateValue(x as any, validators),
+    }),
+    primitive: async innerField => ({
+      ...innerField,
+      error: await validateValue(innerField as ConditionalFormField<TValue>, validators),
+    }),
+  });
 }
 
-function containsError(field: ConditionalFormField<any>): any {
+interface Visitor<TValue> {
+  array: (field: ArrayFormField<TValue & any[]>) => any;
+  complex: (field: ComplexFormField<TValue & object>) => any;
+  primitive: (field: PrimitiveFormField<TValue>) => any;
+}
+
+function visitFormFields<TValue, TField extends ConditionalFormField<TValue>>(
+  field: TField,
+  visitor: Visitor<TValue>,
+): any {
   if (field.type === "array") {
-    return field.value.some(containsError);
+    return visitor.array(field as ArrayFormField<TValue & any[]>);
   } else if (field.type === "primitive") {
-    return ((field as unknown) as PrimitiveFormField<any>).error;
+    return visitor.primitive(field as PrimitiveFormField<TValue>);
   } else {
-    return Object.keys(field.value).some(key => containsError(field.value[key as any]));
+    return visitor.complex(field as ComplexFormField<TValue & object>);
+  }
+}
+
+function containsError<T>(field: ConditionalFormField<T>): boolean {
+  if (field.type === "array" && field && field.value) {
+    return ((field as unknown) as ArrayFormField<T & any[]>).value.some(containsError);
+  } else if (field.type === "primitive") {
+    return !!((field as unknown) as PrimitiveFormField<T>).error;
+  } else {
+    return Object.keys(field.value).some(key => containsError((field as any).value[key as any]));
   }
 }
 
@@ -189,7 +199,7 @@ export type FormOptions<TState> = {
   submit: SubmitFunc<TState>;
 } & ObjectFieldValidation<TState>;
 
-export function useForm<TState extends object>(initState: TState, options: FormOptions<TState>): FormState<TState> {
+export function useForm<TState>(initState: TState, options: FormOptions<TState>): FormState<TState> {
   const stateRef = React.useRef<FormState<TState>>();
   const submitRef = React.useRef<SubmitFunc<TState>>();
 
@@ -197,25 +207,20 @@ export function useForm<TState extends object>(initState: TState, options: FormO
   let state: FormState<TState>;
 
   [state, setState] = React.useState<FormState<TState>>(() => {
-    const fieldsUpdater = (updater: (fields: FormObject<TState>) => FormObject<TState>) => {
-      setState(prev => {
-        const value = updater(prev.value);
-        const dirty = prev.dirty
-          ? true
-          : !_.isEqual(extractFormFieldValuesObject(prev.value), extractFormFieldValuesObject(value));
-        return { ...prev, value, dirty };
+    const fieldsUpdater = (updater: (fields: any) => any) => {
+      setState(oldValue => {
+        return { ...state, ...updater(oldValue) };
       });
     };
 
     return {
-      value: createComplexFormFieldValues(initState, [], options.fieldValidation, fieldsUpdater as any),
-      disabled: false,
+      ...createFormField(initState, [], options, fieldsUpdater),
       submitting: false,
       dirty: false,
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
-          value: createComplexFormFieldValues(newState || initState, [], options.fieldValidation, fieldsUpdater as any),
+          ...createFormField(newState || initState, [], options, fieldsUpdater),
           dirty: false,
         })),
       submit: async () => {
@@ -232,46 +237,38 @@ export function useForm<TState extends object>(initState: TState, options: FormO
           // Touch all, disable all and set submitting
           currentState = updateState({
             ...currentState,
-            value: _.mapValues(currentState.value, innderFields =>
-              mapFormFields(innderFields, (value: PrimitiveFormField<any>) => ({
-                ...value,
-                disabled: true,
-                touched: true,
-              })),
-            ) as any,
-            disabled: true,
+            ...mapFormFields(currentState as any, (value: PrimitiveFormField<any>) => ({
+              ...value,
+              props: { ...value.props, disabled: true },
+              touched: true,
+            })),
             submitting: true,
           });
 
-          // Start field validation in parallell
-          const valResults = _.mapValues(currentState.value, field =>
-            validateFields(field as any, options.fieldValidation),
-          );
-
-          // TODO add form validation here
-
           // Await and merge all validation results into the fields
-          currentState = updateState({
-            ...currentState,
-            value: await mergeInValidationResultsObject(currentState.value, valResults),
-          });
+          currentState = await mergeInValidationResults<TState, FormState<TState>>(currentState, options);
 
           // Submit if no error
-          if (!complexFieldContainsError(currentState.value)) {
-            await submitRef.current!(extractFormFieldValuesObject(currentState.value));
+          if (!containsError(currentState as any)) {
+            await submitRef.current!(extractFormFieldValues(currentState));
+            // "Un-touch" all
             setState(prev => ({
               ...prev,
-              dirty: false,
+              ...mapFormFields(prev as any, (value: PrimitiveFormField<any>) => ({
+                ...value,
+                touched: false,
+              })),
             }));
+          } else {
+            setState(() => currentState);
           }
         } finally {
           setState(prev => ({
             ...prev,
-            fields: mapFormFields(prev.value, field => ({
+            ...mapFormFields(prev as any, field => ({
               ...field,
-              disabled: false,
+              props: { ...field.props, disabled: false },
             })),
-            disabled: false,
             submitting: false,
           }));
         }
@@ -297,11 +294,12 @@ function getValdator<TValue>(
 ) {
   return (newValue: TValue) => {
     const valResult: any = validator ? validator(newValue) : undefined;
+
     if (valResult && valResult.then && valResult.catch) {
       valResult
-        .then((res: any) =>
-          setter(prev => (newValue === prev.value ? { ...prev, error: res, validating: false } : prev)),
-        )
+        .then((res: any) => {
+          setter(prev => (newValue === prev.value ? { ...prev, error: res, validating: false } : prev));
+        })
         .catch(() =>
           setter(prev => (newValue === prev.value ? { ...prev, error: "Validation failed", validating: false } : prev)),
         );
@@ -314,10 +312,10 @@ function getValdator<TValue>(
 function createFormField<TValue>(
   initValue: TValue,
   path: Array<string | number>,
-  fieldValidation: FieldValidation<TValue>,
+  fieldValidation: ObjectFieldValidation<TValue>,
   setter: (updater: (prev: ConditionalFormField<TValue>) => ConditionalFormField<TValue>) => void,
 ): ConditionalFormField<TValue> {
-  if (_.isArray(initValue)) {
+  if (Array.isArray(initValue)) {
     return createArrayFormField(initValue, path, fieldValidation, setter as any) as ConditionalFormField<TValue>;
     // Consider null to be a primitive field
   } else if (typeof initValue === "object" && initValue !== null) {
@@ -328,7 +326,7 @@ function createFormField<TValue>(
       setter as any,
     ) as unknown) as ConditionalFormField<TValue>;
   } else {
-    return createPrimitiveFormField(initValue, path, fieldValidation as any, setter) as ConditionalFormField<TValue>;
+    return createPrimitiveFormField(initValue, path, fieldValidation, setter) as ConditionalFormField<TValue>;
   }
 }
 
@@ -364,7 +362,7 @@ function createArrayFormField<TValue extends any[]>(
   return {
     ...getBasicField(path, setValue),
     type: "array",
-    value: _.map(initValue, createFormFieldInArray),
+    value: initValue.map(createFormFieldInArray),
     remove: (index: number) => setter(prev => ({ ...prev, value: prev.value.filter((__, i) => i !== index) })),
     push: (newEntry: TValue[0]) =>
       setter(prev => ({
@@ -377,14 +375,14 @@ function createArrayFormField<TValue extends any[]>(
 function createComplexFormFieldValues<TObject extends object>(
   object: TObject,
   path: Array<string | number>,
-  objectValidation: ObjectFieldValidation<TObject> | undefined,
+  objectValidation: FieldValidation<TObject> | undefined,
   setter: (updater: (prev: ConditionalFormField<TObject>) => ConditionalFormField<TObject>) => void,
 ): FormObject<TObject> {
-  return _.mapValues(object, (val, key) =>
+  return mapValues(object, (val, key) =>
     createFormField(
       val,
       [...path, key],
-      ((objectValidation && objectValidation.fieldValidation ? objectValidation.fieldValidation : {}) as any)[key],
+      ((objectValidation ? objectValidation : {}) as any)[key],
       updater =>
         setter(
           prev =>
@@ -400,7 +398,7 @@ function createComplexFormFieldValues<TObject extends object>(
 function createComplexFormField<TValue extends object>(
   initValue: TValue,
   path: Array<string | number>,
-  objectValidation: ObjectFieldValidation<TValue>,
+  objectValidation: ObjectFieldValidation<TValue> | undefined,
   setter: (updater: (prev: ConditionalFormField<TValue>) => ConditionalFormField<TValue>) => void,
 ): ComplexFormField<TValue> {
   const executeValidation = getValdator<TValue>(setter, objectValidation ? objectValidation.validation : undefined);
@@ -420,21 +418,12 @@ function createComplexFormField<TValue extends object>(
         ) as any,
     );
 
-  const setValue = (newValue: TValue) => {
-    if (newValue !== null) {
-      setter(prev => ({
-        ...prev,
-        value: getFieldsFromValue(newValue),
-        ...executeValidation(newValue),
-      }));
-    } else {
-      setter(prev => ({
-        ...prev,
-        value: null,
-        ...executeValidation(newValue),
-      }));
-    }
-  };
+  const setValue = (newValue: TValue) =>
+    setter(prev => ({
+      ...prev,
+      value: newValue !== null ? getFieldsFromValue(newValue) : null,
+      ...executeValidation(newValue),
+    }));
 
   return {
     ...getBasicField(path, setValue),
@@ -457,7 +446,11 @@ function createPrimitiveFormField<TValue>(
   const setValue = (newValue: TValue) => {
     setter(prev => {
       // Tranform a primitive field to a complex fied (prop.field == null => prop.field == {})
-      if ((!prev || prev.value === null || prev.value === undefined) && _.isObject(newValue)) {
+      if (
+        newValue !== null &&
+        (!prev || prev.value === null || prev.value === undefined) &&
+        typeof newValue === "object"
+      ) {
         return createComplexFormField(
           newValue,
           path,
@@ -485,7 +478,7 @@ function createPrimitiveFormField<TValue>(
         setter(prev => ({
           ...prev,
           touched: true,
-          ...executeValidation(prev.value as any),
+          ...(prev && prev.value ? executeValidation(prev.value as any) : {}),
         })),
     },
     value: initValue,

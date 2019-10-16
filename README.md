@@ -170,7 +170,7 @@ TODO when interface is stable
 
 ## Limitations and todos
 
-- Lodash is required (should probably be removed, most its mapValues that is used)
+- ~~Lodash is required (should probably be removed, most its mapValues that is used)~~
 - ~~No form level validation (should be implemented when needed)~~
 - No opiniated way of doing validation (could perhaps support yoi out of the box but without a dependency)
 - Arrays must not be used as tuples (same type is assumed on all indexes)
