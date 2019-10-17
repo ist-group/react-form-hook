@@ -22,10 +22,17 @@ const FormComponent = () => {
       description: "",
     },
     {
-      fieldValidation: {
-        id: id => (!id ? "Id is an required field" : undefined),
-      },
-      submit: values => doSomething(values),
+      validation:
+      {
+        inner: {
+          // This is a validator for a specific field, triggered onchange.
+          id: id => !id && "Id is an required field",
+        },
+        onChange: values => values.name && values.name.length < 1 && "The name needs to have more letters",
+        // This is a validator for all the fileds, triggered at submit
+        onSubmit: values => !values.name && !values.description && "You need to specify either name or description",
+      }
+      onSubmit: values => doSomething(values),
     },
   );
 
@@ -73,19 +80,27 @@ const FormComponent = () => {
       id: "",
       name: "",
       description: "",
-      listOfObjects: [{type: ""}]
+      list: [{type: ""}]
     },
     {
-      fieldValidation: {
-        id: id => (!id ? "Id is an required field" : undefined),
-        listOfObjects: {
-          fieldValidation: {
-            type: value => (!value ? "type is required" : undefined),
+      validation: {
+        inner: {
+          id: id => (!id ? "Id is an required field" : undefined),
+          list: {
+            // Validate the content in the list indiually
+            inner: {
+              // The content is an complex field, add a field validator for the object
+              inner: {
+                type: {
+                  onChange: value => (!value ? "type is required" : undefined),
+                }
+              }
+            }
+            onSubmit: (list => (list.length > 10 ? "You can max have 10 listOfObjects": undefined))
           }
-          validate: (list => (list.length > 10 ? "You can max have 10 listOfObjects": undefined))
         }
       },
-      submit: values => doSomething(values),
+      onSubmit: values => doSomething(values),
     },
   );
 
@@ -127,16 +142,20 @@ const FormComponent = () => {
       extraInfo: null
     },
     {
-      fieldValidation: {
-        id: id => (!id ? "Id is an required field" : undefined),
-        requiredInfo: {
-          fieldValidation: {
-            foo: value => (!value ? "foo is required" : undefined),
-          }
-          validate: (values => (!values.bar && !values.baz ? "You need to specify either bar or baz": undefined))
-        },
+      validation: {
+        inner: {
+          requiredInfo: {
+            inner: {
+              foo: {
+                onChange: value => !value && "foo is required",
+              }
+            },
+            onChange: values => !values.bar && !values.baz && "You need to specify either bar or baz",
+          },
+        }
+
       },
-      submit: values => doSomething(values),
+      onSubmit: values => doSomething(values),
     },
   );
 
@@ -170,8 +189,6 @@ TODO when interface is stable
 
 ## Limitations and todos
 
-- ~~Lodash is required (should probably be removed, most its mapValues that is used)~~
-- ~~No form level validation (should be implemented when needed)~~
 - No opiniated way of doing validation (could perhaps support yoi out of the box but without a dependency)
 - Arrays must not be used as tuples (same type is assumed on all indexes)
 - No debouncing on async validation (should probably be implemented)
@@ -179,7 +196,3 @@ TODO when interface is stable
 - Only basic array manipulation supported (push and remove) (implement more when needed)
 - No pre-bundled helper components to render fields (formik has it, but it may not be needed)
 - No pre-bundled helper components to render validation errors (formik has it, but it may not be needed)
-
-```
-
-```

@@ -7,8 +7,14 @@
   "private": false,
   "devDependencies": {
     "@ist-group/tslint-config": "^1.4.0",
+    "@testing-library/react-hooks": "^3.1.0",
+    "@types/jest": "^24.0.19",
     "@types/react": "^16.9.2",
-    "typescript": "^3.6.2"
+    "jest": "^24.9.0",
+    "react": "^16.10.2",
+    "react-test-renderer": "^16.10.2",
+    "ts-jest": "^24.1.0",
+    "typescript": "^3.6.4"
   },
   "peerDependencies": {
     "react": "^16.9.0"
@@ -22,6 +28,7 @@
   "scripts": {
     "build": "tsc",
     "build-watch": "tsc --watch",
+    "test": "jest",
     "prepublishOnly": "tsc"
   },
   "license": "MIT"
