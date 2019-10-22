@@ -42,13 +42,19 @@ export type ConditionalFormField<TState> = [TState] extends [any[]]
   ? ComplexField<TState>
   : PrimitiveField<TState>;
 
-export interface ReadFormState<TState> {
+// This is type is useful when creating reusable "partial" form components that covers some common
+// fields of two different forms
+export type PartialFormState<TState> = ConditionalFormField<TState> & {
+  submitting: boolean;
+};
+
+// Legacy name for PartialFormState for backwards compatibility
+export type ReadFormState<TState> = PartialFormState<TState>;
+
+export type FormState<TState> = PartialFormState<TState> & {
   submit: () => Promise<void>;
   reset: (newInitialValue?: TState) => void;
-  submitting: boolean;
-}
-
-export type FormState<TState> = ConditionalFormField<TState> & ReadFormState<TState>;
+};
 
 interface ComplexValidation<TState extends {}> {
   inner?: FieldValidation<TState>;
