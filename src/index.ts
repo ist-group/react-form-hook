@@ -6,16 +6,13 @@ interface FormField {
   error: string | undefined | null;
   validating: boolean;
   set: (val: any) => void;
+  touch: () => void;
+  disabled: boolean;
 }
 
 export interface PrimitiveField<TValue> extends FormField {
   type: "primitive";
-  props: {
-    name: string;
-    disabled: boolean;
-    onChange: (ev: React.ChangeEvent<any>) => void;
-    onBlur: () => void;
-  };
+  name: string;
   value: TValue;
 }
 
@@ -109,20 +106,20 @@ function extractFormFieldValues<T, U extends ConditionalFormField<T>>(field: U):
   });
 }
 
-function mapFormFields<TValue, F extends ConditionalFormField<TValue>>(
+function mapFieldsDeep<TValue, F extends ConditionalFormField<TValue>>(
   field: F,
-  updater: (prev: PrimitiveField<any>) => PrimitiveField<any>,
+  updater: (prev: FormField) => FormField,
 ): TValue {
   return visitFormFields(field, {
     array: (x: ArrayField<TValue & any[]>) => ({
-      ...x,
-      value: x.value.map((item: any) => mapFormFields(item, updater)),
+      ...updater(x),
+      value: x.value.map((item: any) => mapFieldsDeep(item, updater)),
     }),
     complex: (x: ComplexField<TValue & {}>) => ({
-      ...x,
-      value: mapValues(x.value, innerField => mapFormFields(innerField as any, updater)),
+      ...updater(x),
+      value: mapValues(x.value, innerField => mapFieldsDeep(innerField as any, updater)),
     }),
-    primitive: (y: PrimitiveField<TValue>) => updater(y),
+    primitive: (x: PrimitiveField<TValue>) => updater(x),
   });
 }
 
@@ -255,12 +252,13 @@ export function useForm<TState>(initState: TState, options: FormOptions<TState>)
           // Touch all, disable all and set submitting
           currentState = updateState({
             ...currentState,
-            ...mapFormFields(currentState as any, value => ({
+            ...mapFieldsDeep(currentState as any, value => ({
               ...value,
-              props: { ...value.props, disabled: true },
+              disabled: true,
               touched: true,
             })),
             submitting: true,
+            disabled: true,
           });
 
           currentState = updateState(
@@ -273,7 +271,7 @@ export function useForm<TState>(initState: TState, options: FormOptions<TState>)
             // "Un-touch" all
             setState(prev => ({
               ...prev,
-              ...mapFormFields(prev as any, value => ({
+              ...mapFieldsDeep(prev as any, value => ({
                 ...value,
                 touched: false,
               })),
@@ -282,11 +280,12 @@ export function useForm<TState>(initState: TState, options: FormOptions<TState>)
         } finally {
           setState(prev => ({
             ...prev,
-            ...mapFormFields(prev as any, value => ({
+            ...mapFieldsDeep(prev as any, value => ({
               ...value,
-              props: { ...value.props, disabled: false },
+              disabled: false,
             })),
             submitting: false,
+            disabled: false,
           }));
         }
       },
@@ -384,8 +383,15 @@ function createArrayFormField<TValue extends any[]>(
     }));
   };
 
+  const setTouched = () =>
+    setter(prev => ({
+      ...prev,
+      touched: true,
+      ...executeValidation(prev.value as any),
+    }));
+
   return {
-    ...getBasicField(path, setValue),
+    ...getBasicField(path, setValue, setTouched),
     type: "array",
     value: initValue.map(createFormFieldInArray),
     remove: (index: number) =>
@@ -461,8 +467,15 @@ function createComplexFormField<TValue extends object>(
       ...executeValidation(newValue),
     }));
 
+  const setTouched = () =>
+    setter(prev => ({
+      ...prev,
+      touched: true,
+      ...executeValidation(prev.value as any),
+    }));
+
   return {
-    ...getBasicField(path, setValue),
+    ...getBasicField(path, setValue, setTouched),
     type: "complex",
     value: getFieldsFromValue(initValue),
   };
@@ -500,20 +513,17 @@ function createPrimitiveFormField<TValue>(
     });
   };
 
+  const setTouched = () =>
+    setter(prev => ({
+      ...prev,
+      touched: true,
+      ...(prev && prev.value ? executeValidation(prev.value as any) : {}),
+    }));
+
   return {
-    ...getBasicField(path, setValue),
+    ...getBasicField(path, setValue, setTouched),
     type: "primitive",
-    props: {
-      name: pathToString(path),
-      disabled: false,
-      onChange: ev => setValue(ev.target.value),
-      onBlur: () =>
-        setter(prev => ({
-          ...prev,
-          touched: true,
-          ...(prev && prev.value ? executeValidation(prev.value as any) : {}),
-        })),
-    },
+    name: pathToString(path),
     value: initValue,
   };
 }
@@ -528,12 +538,14 @@ function pathToString(path: Array<string | number>): string {
   );
 }
 
-function getBasicField<T>(path: Array<string | number>, set: (val: T) => void): FormField {
+function getBasicField<T>(path: Array<string | number>, set: (val: T) => void, touch: () => void): FormField {
   return {
     path,
     touched: false,
     error: undefined,
     validating: false,
+    disabled: false,
     set,
+    touch,
   };
 }

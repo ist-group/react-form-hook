@@ -53,7 +53,7 @@ const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
         },
         onSubmit: value => {
           if (myMock) {
-            myMock(value);
+            return myMock(value);
           }
         },
       },
@@ -123,18 +123,21 @@ test("onSubmit", async () => {
   expect(result.current.value.item!.value!.id.error).toBeFalsy();
   expect(result.current.value.item!.error).toBeFalsy();
 
-  result.current.value.list.remove(0);
-  result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-  result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-  result.current.value.item!.value!.id.set("ok");
-  result.current.value.item!.value!.name.set("ok");
-  result.current.value.item!.value!.description!.set("ok");
-  result.current.value.id.set("ok");
-  result.current.value.name.set("ok");
-  result.current.value.description!.set("ok");
-  result.current.submit();
+  await act(async () => {
+    result.current.value.list.remove(0);
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.item!.value!.id.set("ok");
+    result.current.value.item!.value!.name.set("ok");
+    result.current.value.item!.value!.description!.set("ok");
+    result.current.value.id.set("ok");
+    result.current.value.name.set("ok");
+    result.current.value.description!.set("ok");
+  });
 
-  await waitForNextUpdate();
+  await act(async () => {
+    result.current.submit();
+  });
 
   expect(myMock).toBeCalled();
   expect(result.current.value.id.value).toBe("ok");
@@ -146,12 +149,40 @@ test("onSubmit", async () => {
   expect(result.current.value.list.value[0].value.id.error).toBeFalsy();
 });
 
+test("onSubmit executing", async () => {
+  const myMock = jest.fn(() => new Promise(() => {}));
+  const { result } = getBasicFormSetup(myMock);
+
+  await act(async () => {
+    result.current.value.list.remove(0);
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.item!.value!.id.set("ok");
+    result.current.value.item!.value!.name.set("ok");
+    result.current.value.item!.value!.description!.set("ok");
+    result.current.value.id.set("ok");
+    result.current.value.name.set("ok");
+    result.current.value.description!.set("ok");
+  });
+
+  await act(async () => {
+    result.current.submit();
+  });
+
+  expect(result.current.submitting).toBeTruthy();
+  expect(result.current.disabled).toBeTruthy();
+  expect(result.current.touched).toBeTruthy();
+  expect(result.current.value.id.disabled).toBeTruthy();
+  expect(result.current.value.id.touched).toBeTruthy();
+});
+
 test("onSubmit validation", async () => {
   const myMock = jest.fn();
   const { result, waitForNextUpdate } = getBasicFormSetup(myMock);
 
-  result.current.submit();
-  await waitForNextUpdate();
+  await act(async () => {
+    result.current.submit();
+  });
 
   expect(myMock.mock.calls.length).toBe(0);
   expect(result.current.value.id.value).toBe("");
