@@ -33,7 +33,7 @@ export type FormObject<TState extends object> = { [P in keyof TState]: Readonly<
 // Special care to not distribute union types: https://github.com/Microsoft/TypeScript/issues/29368
 export type ConditionalFormField<TState> = [TState] extends [any[]]
   ? ArrayField<TState>
-  : [TState] extends [boolean | null | undefined]
+  : [TState] extends [boolean | null | undefined | Date]
   ? PrimitiveField<TState>
   : TState extends object
   ? ComplexField<TState>
@@ -74,7 +74,7 @@ export type ValidateFunc<TValue> = (
 
 export type ConditionalValidation<TState> = [TState] extends [any[]]
   ? ArrayValidation<TState>
-  : [TState] extends [boolean | null | undefined]
+  : [TState] extends [boolean | null | undefined | Date]
   ? PrimitiveValidation<TState>
   : [TState] extends object
   ? ComplexValidation<TState>
@@ -333,8 +333,8 @@ function createFormField<TValue>(
 ): ConditionalFormField<TValue> {
   if (Array.isArray(initValue)) {
     return createArrayFormField(initValue, path, validation, setter as any) as ConditionalFormField<TValue>;
-    // Consider null to be a primitive field
-  } else if (typeof initValue === "object" && initValue !== null) {
+    // Consider null and Date to be primitive fields
+  } else if (typeof initValue === "object" && initValue !== null && !(initValue instanceof Date)) {
     return (createComplexFormField(
       initValue as TValue & object,
       path,
@@ -494,6 +494,7 @@ function createPrimitiveFormField<TValue>(
       // Tranform a primitive field to a complex fied (prop.field == null => prop.field == {})
       if (
         newValue !== null &&
+        !(newValue instanceof Date) &&
         (!prev || prev.value === null || prev.value === undefined) &&
         typeof newValue === "object"
       ) {
@@ -530,12 +531,9 @@ function createPrimitiveFormField<TValue>(
 
 function pathToString(path: Array<string | number>): string {
   const [firstElement, ...theRest] = path;
-  return theRest.reduce(
-    (pathString: string, value: string | number) => {
-      return `${pathString}[${value}]`;
-    },
-    firstElement as string,
-  );
+  return theRest.reduce((pathString: string, value: string | number) => {
+    return `${pathString}[${value}]`;
+  }, firstElement as string);
 }
 
 function getBasicField<T>(path: Array<string | number>, set: (val: T) => void, touch: () => void): FormField {

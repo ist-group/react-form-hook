@@ -6,6 +6,7 @@ interface Item {
   id: string;
   name: string | null;
   description?: string;
+  date: Date;
 }
 
 interface FormProps extends Item {
@@ -20,8 +21,9 @@ const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
         id: "",
         name: "",
         description: "",
-        list: [{ id: "", name: "", description: "" }],
-        item: { id: "", name: "", description: "" },
+        list: [{ id: "", name: "", description: "", date: new Date() }],
+        item: { id: "", name: "", description: "", date: new Date() },
+        date: new Date(),
       },
       {
         validation: {
@@ -63,15 +65,19 @@ const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
 test("initial value", () => {
   const { result } = getBasicFormSetup();
 
+  const date = new Date();
+
   act(() => {
     result.current.value.id.set("test");
     result.current.value.name.set("test2");
     result.current.value.description!.set("test3");
+    result.current.value.date.set(date);
   });
 
   expect(result.current.value.id.value).toBe("test");
   expect(result.current.value.name.value).toBe("test2");
   expect(result.current.value.description!.value).toBe("test3");
+  expect(result.current.value.date.value.toISOString()).toBe(date.toISOString());
 });
 
 test("Arrays - push", () => {
@@ -80,8 +86,9 @@ test("Arrays - push", () => {
   expect(result.current.value.list).toBeDefined();
 
   expect(result.current.value.list.touched).toBe(false);
+  const date = new Date();
   act(() => {
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
   });
   expect(result.current.value.list.touched).toBe(true);
   expect(result.current.value.list.value[1].touched).toBe(false);
@@ -90,25 +97,27 @@ test("Arrays - push", () => {
   expect(result.current.value.list.value[1].value.id.value).toBe("id-test");
   expect(result.current.value.list.value[1].value.name.value).toBe("name-test");
   expect(result.current.value.list.value[1].value.description!.value).toBe("description-test");
+  expect(result.current.value.list.value[1].value.date!.value.toISOString()).toBe(date.toISOString());
 });
 
 test("Arrays -  onChange validation", () => {
   const { result } = getBasicFormSetup();
 
+  const date = new Date();
   act(() => {
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
   });
   expect(result.current.value.list.error).toBeFalsy();
   act(() => {
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
   });
   expect(result.current.value.list.error).toBe("You can max have 10 list");
 });
@@ -124,9 +133,10 @@ test("onSubmit", async () => {
   expect(result.current.value.item!.error).toBeFalsy();
 
   await act(async () => {
+    const date = new Date();
     result.current.value.list.remove(0);
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
     result.current.value.item!.value!.id.set("ok");
     result.current.value.item!.value!.name.set("ok");
     result.current.value.item!.value!.description!.set("ok");
@@ -154,15 +164,18 @@ test("onSubmit executing", async () => {
   const { result } = getBasicFormSetup(myMock);
 
   await act(async () => {
+    const date = new Date();
+    const newDate = new Date("2019-01-01");
     result.current.value.list.remove(0);
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test" });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
+    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
     result.current.value.item!.value!.id.set("ok");
     result.current.value.item!.value!.name.set("ok");
     result.current.value.item!.value!.description!.set("ok");
     result.current.value.id.set("ok");
     result.current.value.name.set("ok");
     result.current.value.description!.set("ok");
+    result.current.value.date.set(newDate);
   });
 
   await act(async () => {
@@ -203,4 +216,28 @@ test("Arrays - remove", () => {
   });
   expect(result.current.value.list.touched).toBe(true);
   expect(result.current.value.list.value.length).toBe(0);
+});
+
+test("Date - date to array and back", () => {
+  const { result } = getBasicFormSetup();
+
+  const d1 = new Date("2019-01-01");
+  const d2 = new Date("2019-01-02");
+
+  act(() => {
+    result.current.value.date.set(d1);
+  });
+  expect(result.current.value.date.value.toISOString()).toBe(d1.toISOString());
+
+  act(() => {
+    result.current.value.date.set([d1, d2]);
+  });
+  expect(result.current.value.date.value).toHaveLength(2);
+  expect(((result.current.value.date.value as unknown) as Date[])[0].toISOString()).toBe(d1.toISOString());
+  expect(((result.current.value.date.value as unknown) as Date[])[1].toISOString()).toBe(d2.toISOString());
+
+  act(() => {
+    result.current.value.date.set(d1);
+  });
+  expect(result.current.value.date.value.toISOString()).toBe(d1.toISOString());
 });
