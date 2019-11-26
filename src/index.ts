@@ -8,7 +8,7 @@ interface FormField<TValue> {
   set: (val: any) => void;
   touch: () => void;
   disabled: boolean;
-  getValue: () => TValue;
+  rawValue: TValue;
 }
 
 export interface PrimitiveField<TValue> extends FormField<TValue> {
@@ -234,14 +234,12 @@ export function useForm<TState>(initState: TState, options: FormOptions<TState>)
     const getState = () => stateRef.current!;
 
     return {
-      ...createFormField(initState, [], options.validation, updateState, () => extractFormFieldValues(getState())),
+      ...createFormField(initState, [], options.validation, updateState),
       submitting: false,
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
-          ...createFormField(newState || initState, [], options.validation, updateState, () =>
-            extractFormFieldValues(getState()),
-          ),
+          ...createFormField(newState || initState, [], options.validation, updateState),
         })),
       submit: async () => {
         if (stateRef.current!.submitting) {
@@ -335,16 +333,9 @@ function createFormField<TValue>(
   path: Array<string | number>,
   validation: ConditionalValidation<TValue> | undefined,
   setter: (updater: (prev: ConditionalFormField<TValue>) => ConditionalFormField<TValue>) => void,
-  getter: () => TValue,
 ): ConditionalFormField<TValue> {
   if (Array.isArray(initValue)) {
-    return createArrayFormField(
-      initValue,
-      path,
-      validation as any,
-      setter as any,
-      getter as any,
-    ) as ConditionalFormField<TValue>;
+    return createArrayFormField(initValue, path, validation as any, setter as any) as ConditionalFormField<TValue>;
     // Consider null and Date to be primitive fields
   } else if (typeof initValue === "object" && initValue !== null && !(initValue instanceof Date)) {
     return (createComplexFormField(
@@ -352,10 +343,9 @@ function createFormField<TValue>(
       path,
       validation as any,
       setter as any,
-      getter as any,
     ) as unknown) as ConditionalFormField<TValue>;
   } else {
-    return createPrimitiveFormField(initValue, path, validation, setter, getter) as ConditionalFormField<TValue>;
+    return createPrimitiveFormField(initValue, path, validation, setter) as ConditionalFormField<TValue>;
   }
 }
 
@@ -364,7 +354,6 @@ function createArrayFormField<TValue extends any[]>(
   path: Array<string | number>,
   validation: ArrayValidation<TValue> | undefined,
   setter: (updater: (prev: ArrayField<TValue>) => ArrayField<TValue>) => void,
-  getter: () => TValue,
 ): ArrayField<TValue> {
   const executeValidation = getValdator(setter as any, validation as ConditionalValidation<TValue>);
   const setterWithValidation = (originalUpdater: (prev: ArrayField<TValue>) => ArrayField<TValue>) => {
@@ -379,18 +368,16 @@ function createArrayFormField<TValue extends any[]>(
   };
 
   const createFormFieldInArray = <T>(val: T, index: number) =>
-    createFormField(
-      val,
-      [...path, index],
-      validation && validation.inner,
-      updater =>
-        setterWithValidation(prev => ({
-          ...prev,
-          value: prev.value.map((prevValue: any, prevIndex) =>
-            index === prevIndex ? updater(prevValue) : prevValue,
-          ) as any,
-        })),
-      () => getter()[index],
+    createFormField(val, [...path, index], validation && validation.inner, updater =>
+      setterWithValidation(prev => ({
+        ...prev,
+        value: prev.value.map((prevValue: any, prevIndex) =>
+          index === prevIndex ? updater(prevValue) : prevValue,
+        ) as any,
+        rawValue: prev.rawValue.map((prevRawValue: any, prevRawIndex) =>
+          index === prevRawIndex ? val : prevRawValue,
+        ) as any,
+      })),
     ) as ConditionalFormField<TValue[0]>;
 
   const setValue = (newValue: TValue) => {
@@ -398,6 +385,7 @@ function createArrayFormField<TValue extends any[]>(
       ...prev,
       touched: true,
       value: newValue.map(createFormFieldInArray),
+      rawValue: newValue,
       ...executeValidation(newValue),
     }));
   };
@@ -410,7 +398,7 @@ function createArrayFormField<TValue extends any[]>(
     }));
 
   return {
-    ...getBasicField(path, setValue, setTouched, getter),
+    ...getBasicField(path, setValue, setTouched, initValue),
     type: "array",
     value: initValue.map(createFormFieldInArray),
     remove: (index: number) =>
@@ -425,13 +413,12 @@ function createArrayFormField<TValue extends any[]>(
 }
 
 function createComplexFormFieldValues<TObject extends object>(
-  object: TObject,
+  value: TObject,
   path: Array<string | number>,
   objectValidation: ComplexInnerValidation<TObject> | undefined,
   setter: (updater: (prev: ConditionalFormField<TObject>) => ConditionalFormField<TObject>) => void,
-  getter: () => TObject,
 ): FormObject<TObject> {
-  return mapValues(object, (val, key) =>
+  return mapValues(value, (val, key) =>
     createFormField(
       val,
       [...path, key],
@@ -444,7 +431,6 @@ function createComplexFormFieldValues<TObject extends object>(
               [key]: updater(((prev || {}) as any)[key]),
             } as any),
         ) as any,
-      () => (getter() as any)[key],
     ),
   ) as any;
 }
@@ -454,7 +440,6 @@ function createComplexFormField<TValue extends object>(
   path: Array<string | number>,
   objectValidation: ComplexValidation<TValue> | undefined,
   setter: (updater: (prev: ConditionalFormField<TValue>) => ConditionalFormField<TValue>) => void,
-  getter: () => TValue,
 ): ComplexField<TValue> {
   const executeValidation = getValdator(setter, objectValidation as any);
   const childDataValidation = (value: any) => {
@@ -464,7 +449,7 @@ function createComplexFormField<TValue extends object>(
     return {};
   };
 
-  const getFieldsFromValue = (newValue: TValue) =>
+  const createNestedValueFromValue = (newValue: TValue) =>
     createComplexFormFieldValues(
       newValue,
       path,
@@ -480,13 +465,13 @@ function createComplexFormField<TValue extends object>(
             ...childDataValidation(value),
           };
         }) as any,
-      () => getter(),
     );
 
   const setValue = (newValue: TValue) =>
     setter(prev => ({
       ...prev,
-      value: newValue !== null ? getFieldsFromValue(newValue) : null,
+      value: newValue !== null ? createNestedValueFromValue(newValue) : null,
+      rawValue: newValue,
       ...executeValidation(newValue),
     }));
 
@@ -498,9 +483,9 @@ function createComplexFormField<TValue extends object>(
     }));
 
   return {
-    ...getBasicField(path, setValue, setTouched, getter),
+    ...getBasicField(path, setValue, setTouched, initValue),
     type: "complex",
-    value: getFieldsFromValue(initValue),
+    value: createNestedValueFromValue(initValue),
   };
 }
 
@@ -509,7 +494,6 @@ function createPrimitiveFormField<TValue>(
   path: Array<string | number>,
   validate: ConditionalValidation<TValue> | undefined,
   setter: (updater: (prev: ConditionalFormField<TValue>) => ConditionalFormField<TValue>) => void,
-  getter: () => TValue,
 ): PrimitiveField<TValue> {
   const executeValidation = getValdator(setter, validate);
 
@@ -527,12 +511,12 @@ function createPrimitiveFormField<TValue>(
           path,
           validate && (validate as ComplexValidation<TValue & {}>).inner,
           setter as any,
-          getter,
         ) as any;
       } else {
         return {
           ...prev,
           value: newValue,
+          rawValue: newValue,
           ...executeValidation(newValue),
         };
       }
@@ -547,7 +531,7 @@ function createPrimitiveFormField<TValue>(
     }));
 
   return {
-    ...getBasicField(path, setValue, setTouched, getter),
+    ...getBasicField(path, setValue, setTouched, initValue),
     type: "primitive",
     name: pathToString(path),
     value: initValue,
@@ -565,7 +549,7 @@ function getBasicField<T>(
   path: Array<string | number>,
   set: (val: T) => void,
   touch: () => void,
-  get: () => T,
+  rawValue: T,
 ): FormField<T> {
   return {
     path,
@@ -575,6 +559,6 @@ function getBasicField<T>(
     disabled: false,
     set,
     touch,
-    getValue: get,
+    rawValue,
   };
 }
