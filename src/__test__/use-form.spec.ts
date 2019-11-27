@@ -21,7 +21,10 @@ const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
         id: "",
         name: "",
         description: "",
-        list: [{ id: "", name: "", description: "", date: new Date() }],
+        list: [
+          { id: "", name: "", description: "", date: new Date() },
+          { id: "2", name: "Test 2", description: "", date: new Date() },
+        ],
         item: { id: "", name: "", description: "", date: new Date() },
         date: new Date(),
       },
@@ -41,7 +44,7 @@ const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
                 onSubmit: value => !value.name && !value.description && "Either name or description is required",
               },
               onChange: list => list.length > 10 && "You can max have 10 list",
-              onSubmit: list => list.length === 1 && "One item is not allowed",
+              onSubmit: list => list.length === 2 && "Two items is not allowed",
             },
             item: {
               inner: {
@@ -93,11 +96,11 @@ test("Arrays - push", () => {
   expect(result.current.value.list.touched).toBe(true);
   expect(result.current.value.list.value[1].touched).toBe(false);
 
-  expect(result.current.value.list.value.length).toBe(2);
-  expect(result.current.value.list.value[1].value.id.value).toBe("id-test");
-  expect(result.current.value.list.value[1].value.name.value).toBe("name-test");
-  expect(result.current.value.list.value[1].value.description!.value).toBe("description-test");
-  expect(result.current.value.list.value[1].value.date!.value.toISOString()).toBe(date.toISOString());
+  expect(result.current.value.list.value.length).toBe(3);
+  expect(result.current.value.list.value[2].value.id.value).toBe("id-test");
+  expect(result.current.value.list.value[2].value.name.value).toBe("name-test");
+  expect(result.current.value.list.value[2].value.description!.value).toBe("description-test");
+  expect(result.current.value.list.value[2].value.date!.value.toISOString()).toBe(date.toISOString());
 });
 
 test("Arrays -  onChange validation", () => {
@@ -105,7 +108,6 @@ test("Arrays -  onChange validation", () => {
 
   const date = new Date();
   act(() => {
-    result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
     result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
     result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
     result.current.value.list.push({ id: "id-test", name: "name-test", description: "description-test", date });
@@ -200,22 +202,43 @@ test("onSubmit validation", async () => {
   expect(myMock.mock.calls.length).toBe(0);
   expect(result.current.value.id.value).toBe("");
   expect(result.current.value.id.error).toBe("Id is required");
-  expect(result.current.value.list.error).toBe("One item is not allowed");
+  expect(result.current.value.list.error).toBe("Two items is not allowed");
   expect(result.current.value.item!.value!.id.error).toBe("Id is required");
   expect(result.current.value.item!.error).toBe("Either name or description is required");
   expect(result.current.value.list.value[0].error).toBe("Either name or description is required");
   expect(result.current.value.list.value[0].value.id.error).toBe("Id is required");
 });
 
-test("Arrays - remove", () => {
+test("Arrays - remove - touched", () => {
   const { result } = getBasicFormSetup();
-
   expect(result.current.value.list.touched).toBe(false);
+
   act(() => {
-    result.current.value.list.remove(0);
+    result.current.value.list.remove(1);
   });
   expect(result.current.value.list.touched).toBe(true);
-  expect(result.current.value.list.value.length).toBe(0);
+  expect(result.current.value.list.value.length).toBe(1);
+});
+
+test("Arrays - remove set bindings", () => {
+  const { result } = getBasicFormSetup();
+
+  act(() => {
+    result.current.value.list.push({
+      id: "id-test",
+      name: "name-test",
+      description: "description-test",
+      date: new Date(),
+    });
+    result.current.value.list.remove(1);
+    result.current.value.list.value[0].value.name.set("After remove");
+  });
+  expect(result.current.value.list.value[0].value.name.value).toBe("After remove");
+  expect(result.current.value.list.value[1].value.name.value).toBe("name-test");
+  expect(result.current.value.list.value[0].path).toMatchObject(["list", 0]);
+  expect(result.current.value.list.value[1].path).toMatchObject(["list", 1]);
+
+  expect(result.current.value.list.value.length).toBe(2);
 });
 
 test("Date - date to array and back", () => {

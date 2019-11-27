@@ -7,12 +7,11 @@
   "private": false,
   "devDependencies": {
     "@ist-group/tslint-config": "^1.4.0",
-    "@testing-library/react-hooks": "^3.1.0",
+    "@testing-library/react-hooks": "^3.2.1",
     "@types/jest": "^24.0.19",
     "@types/react": "^16.9.2",
     "jest": "^24.9.0",
-    "react": "^16.10.2",
-    "react-test-renderer": "^16.10.2",
+    "react-test-renderer": "^16.12.0",
     "ts-jest": "^24.1.0",
     "typescript": "^3.6.4"
   },

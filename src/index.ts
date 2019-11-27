@@ -403,7 +403,13 @@ function createArrayFormField<TValue extends any[]>(
     type: "array",
     value: initValue.map(createFormFieldInArray),
     remove: (index: number) =>
-      setterWithValidation(prev => ({ ...prev, touched: true, value: prev.value.filter((__, i) => i !== index) })),
+      setterWithValidation(prev => ({
+        ...prev,
+        touched: true,
+        value: prev.value
+          .filter((__, i) => i !== index)
+          .map((val, i) => createFormFieldInArray(extractFormFieldValues(val as any), i)),
+      })),
     push: (newEntry: TValue[0]) =>
       setterWithValidation(prev => ({
         ...prev,
