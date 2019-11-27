@@ -231,11 +231,11 @@ export function useForm<TState>(initState: TState, options: FormOptions<TState>)
       });
     };
 
-    const getState = () => stateRef.current!;
-
     return {
       ...createFormField(initState, [], options.validation, updateState),
       submitting: false,
+
+      // To we need this? Set could be used instead (similar to how React.useState works) though set also runs validation which reset currently does
       reset: (newState?: TState) =>
         setState(prev => ({
           ...prev,
@@ -313,6 +313,7 @@ function getValdator<TValue>(
 ) {
   return (newValue: TValue) => {
     const valResult: any = validator && validator.onChange ? validator.onChange(newValue) : undefined;
+    console.log("Exec", validator);
 
     if (valResult && valResult.then && valResult.catch) {
       valResult
@@ -463,6 +464,7 @@ function createComplexFormField<TValue extends object>(
           return {
             ...value,
             ...childDataValidation(value),
+            ...executeValidation(value.rawValue as any),
           };
         }) as any,
     );
