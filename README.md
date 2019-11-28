@@ -7,9 +7,10 @@ const MyTextComponent = ({ field, ...innerProps }) => {
   return (
     <Input
       value={field.value}
-      {...field.props}
+      onBlur={field.touch}
+      onChange={ev => field.set(ev.value)}
       {...innerProps}
-      className={field.error && field.touched ? "error" : ""}
+      className={field.touched ? field.error : ""}
     />
   );
 };
@@ -24,7 +25,7 @@ const FormComponent = () => {
     {
       validation:
       {
-        inner: {
+        fields: {
           // This is a validator for a specific field, triggered onchange.
           id: id => !id && "Id is an required field",
         },
@@ -38,9 +39,9 @@ const FormComponent = () => {
 
   return (
     <form>
-      <MyTextComponent field={form.value.id} />
-      <MyTextComponent field={form.value.name} />
-      <MyTextComponent field={form.value.description} />
+      <MyTextComponent field={form.fields.id} />
+      <MyTextComponent field={form.fields.name} />
+      <MyTextComponent field={form.fields.description} />
     </form>
   );
 };
@@ -63,7 +64,7 @@ const List = ({ arrayField }) => {
     <div>
       <button onClick={addType}>Add a new Type</button>
       <ul>
-        { arrayField.value.map((val, index) =>
+        { arrayField.items.map((val, index) =>
             <li key={index}>
               <MyTextComponent field={val} />
               <button onClick={() => arrayField.remove(index)} />
@@ -84,13 +85,13 @@ const FormComponent = () => {
     },
     {
       validation: {
-        inner: {
+        fields: {
           id: id => (!id ? "Id is an required field" : undefined),
           list: {
             // Validate the content in the list indiually
-            inner: {
+            item: {
               // The content is an complex field, add a field validator for the object
-              inner: {
+              fields: {
                 type: {
                   onChange: value => (!value ? "type is required" : undefined),
                 }
@@ -106,10 +107,10 @@ const FormComponent = () => {
 
   return (
     <form>
-      <MyTextComponent field={form.value.id} />
-      <MyTextComponent field={form.value.name} />
-      <MyTextComponent field={form.value.description} />
-      <List field={form.value.listOfObjects} />
+      <MyTextComponent field={form.fields.id} />
+      <MyTextComponent field={form.fields.name} />
+      <MyTextComponent field={form.fields.description} />
+      <List field={form.fields.listOfObjects} />
     </form>
   );
 };
@@ -143,9 +144,9 @@ const FormComponent = () => {
     },
     {
       validation: {
-        inner: {
+        fields: {
           requiredInfo: {
-            inner: {
+            fields: {
               foo: {
                 onChange: value => !value && "foo is required",
               }
@@ -166,12 +167,12 @@ const FormComponent = () => {
 
   return (
     <form>
-      <MyTextComponent field={form.value.id} />
-      <MyTextComponent field={form.value.name} />
-      <MyTextComponent field={form.value.description} />
-      <MyChildrenComponent field={form.value.requiredInfo.value} />
-      { form.value.extraInfo.value
-        ? <MyChildrenComponent field={form.value.extraInfo.value} />
+      <MyTextComponent field={form.fields.id} />
+      <MyTextComponent field={form.fields.name} />
+      <MyTextComponent field={form.fields.description} />
+      <MyChildrenComponent field={form.fields.requiredInfo.fields} />
+      { form.fields.extraInfo.fields
+        ? <MyChildrenComponent field={form.fields.extraInfo.fields} />
         : <button onClick={addExtraInfo}>Add Extra Info</button>
       }
     </form>
