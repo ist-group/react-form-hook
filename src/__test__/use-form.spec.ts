@@ -14,55 +14,54 @@ interface FormProps extends Item {
   item?: Item | null;
 }
 
+const initValue = {
+  id: "",
+  name: "",
+  description: "",
+  list: [
+    { id: "", name: "", description: "", date: new Date() },
+    { id: "2", name: "Test 2", description: "", date: new Date() },
+  ],
+  item: { id: "", name: "", description: "", date: new Date() },
+  date: new Date(),
+};
+
 const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
   renderHook(() =>
-    useForm<FormProps>(
-      {
-        id: "",
-        name: "",
-        description: "",
-        list: [
-          { id: "", name: "", description: "", date: new Date() },
-          { id: "2", name: "Test 2", description: "", date: new Date() },
-        ],
-        item: { id: "", name: "", description: "", date: new Date() },
-        date: new Date(),
-      },
-      {
-        validation: {
-          fields: {
-            id: {
-              onSubmit: value => !value && "Id is required",
-            },
-            list: {
-              item: {
-                fields: {
-                  id: {
-                    onSubmit: value => !value && "Id is required",
-                  },
-                },
-                onSubmit: value => !value.name && !value.description && "Either name or description is required",
-              },
-              onChange: list => list.length > 10 && "You can max have 10 list",
-              onSubmit: list => list.length === 2 && "Two items is not allowed",
-            },
+    useForm<FormProps>(initValue, {
+      validation: {
+        fields: {
+          id: {
+            onSubmit: value => !value && "Id is required",
+          },
+          list: {
             item: {
               fields: {
                 id: {
-                  onChange: value => !value && "Id is required",
+                  onSubmit: value => !value && "Id is required",
                 },
               },
-              onSubmit: value => value && !value.name && !value.description && "Either name or description is required",
+              onSubmit: value => !value.name && !value.description && "Either name or description is required",
             },
+            onChange: list => list.length > 10 && "You can max have 10 list",
+            onSubmit: list => list.length === 2 && "Two items is not allowed",
+          },
+          item: {
+            fields: {
+              id: {
+                onChange: value => !value && "Id is required",
+              },
+            },
+            onSubmit: value => value && !value.name && !value.description && "Either name or description is required",
           },
         },
-        onSubmit: value => {
-          if (myMock) {
-            return myMock(value);
-          }
-        },
       },
-    ),
+      onSubmit: value => {
+        if (myMock) {
+          return myMock(value);
+        }
+      },
+    }),
   );
 
 test("initial value", () => {
@@ -263,4 +262,37 @@ test("Date - date to array and back", () => {
     result.current.fields.date.set(d1);
   });
   expect(result.current.fields.date.value.toISOString()).toBe(d1.toISOString());
+});
+
+test("value", () => {
+  const { result } = getBasicFormSetup();
+  expect(result.current.value).toMatchObject(initValue);
+
+  act(() => {
+    result.current.fields.description!.set("new description");
+    result.current.fields.list!.items[0].fields.description!.set("new description for item");
+  });
+
+  expect(result.current.value.description).toBe("new description");
+  expect(result.current.value.list[0].description).toBe("new description for item");
+});
+
+test("validation closure", () => {
+  const { result, rerender } = renderHook(
+    (props: { validValue: string }) =>
+      useForm<string>("", {
+        validation: {
+          onChange: val => (val === props.validValue ? undefined : "ERROR"),
+        },
+        onSubmit: () => {},
+      }),
+    { initialProps: { validValue: "correct value" } },
+  );
+
+  act(() => result.current.set("correct value"));
+  expect(result.current.error).toBeFalsy();
+
+  rerender({ validValue: "new correct value" });
+  act(() => result.current.set("correct value"));
+  expect(result.current.error).toBe("ERROR");
 });

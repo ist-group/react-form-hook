@@ -242,7 +242,7 @@ export function useForm<TState, TValidationError = string>(
   let state: FormState<TState, TValidationError>;
 
   [state, setState] = React.useState<FormState<TState, TValidationError>>(() => {
-    const updateState = (updater: (fields: any) => any) => {
+    const updateState = (updater: (fields: ConditionalFormField<TState, TValidationError>) => any) => {
       setState(oldState => {
         return { ...oldState, ...updater(oldState) };
       });
@@ -383,14 +383,13 @@ function createArrayFormField<TValue extends any[]>(
       () => (validatorFetcher() || {}).item,
       updater =>
         setter(prev => {
-          const value = prev.value.map((prevRawValue: any, prevRawIndex) =>
-            index === prevRawIndex ? val : prevRawValue,
-          ) as any;
+          const items = prev.items.map((prevValue, prevIndex) =>
+            index === prevIndex ? updater(prevValue) : prevValue,
+          );
+          const value = items.map(x => x.value) as TValue;
           return {
             ...prev,
-            items: prev.items.map((prevValue: any, prevIndex) =>
-              index === prevIndex ? updater(prevValue) : prevValue,
-            ) as any,
+            items,
             value,
             touched: true,
             ...executeValidation(value),
