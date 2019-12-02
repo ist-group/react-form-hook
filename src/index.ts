@@ -1,6 +1,7 @@
 import * as React from "react";
 
-interface FormField<TValue, TValidationError> {
+interface FormField<TValue, TValidationError = string> {
+  name: string;
   path: Array<string | number>;
   touched: boolean;
   error: TValidationError | undefined;
@@ -11,35 +12,36 @@ interface FormField<TValue, TValidationError> {
   value: TValue;
 }
 
-export interface PrimitiveField<TValue, TValidationError> extends FormField<TValue, TValidationError> {
+export interface PrimitiveField<TValue, TValidationError = string> extends FormField<TValue, TValidationError> {
   type: "primitive";
-  name: string;
 }
 
 // This is a "fake" specialized primitive field type that is here to teach TypeScript manners (TS 3.7.2)
-export interface NullPrimitiveField<TState, TValidationError> extends FormField<TState, TValidationError> {
+export interface NullPrimitiveField<TState, TValidationError = string> extends FormField<TState, TValidationError> {
   type: "primitive";
   readonly fields?: undefined;
 }
 
-export interface ArrayField<TState extends any[], TValidationError> extends FormField<TState, TValidationError> {
+export interface ArrayField<TState extends any[], TValidationError = string>
+  extends FormField<TState, TValidationError> {
   type: "array";
   readonly items: Readonly<ConditionalFormField<TState[0], TValidationError>[]>;
   push: (newValue: TState[0]) => void;
   remove: (index: number) => void;
 }
 
-export interface ComplexField<TState extends object, TValidationError> extends FormField<TState, TValidationError> {
+export interface ComplexField<TState extends object, TValidationError = string>
+  extends FormField<TState, TValidationError> {
   type: "complex";
   readonly fields: FormFields<TState, TValidationError>;
 }
 
-export type FormFields<TState extends object, TValidationError> = {
+export type FormFields<TState extends object, TValidationError = string> = {
   [P in keyof TState]: Readonly<ConditionalFormField<TState[P], TValidationError>>;
 };
 
 // Special care to not distribute union types: https://github.com/Microsoft/TypeScript/issues/29368
-export type ConditionalFormField<TState, TValidationError> = TState extends null | undefined
+export type ConditionalFormField<TState, TValidationError = string> = TState extends null | undefined
   ? NullPrimitiveField<TState, TValidationError>
   : [TState] extends [any[]]
   ? ArrayField<TState, TValidationError>
@@ -51,37 +53,39 @@ export type ConditionalFormField<TState, TValidationError> = TState extends null
 
 // This is type is useful when creating reusable "partial" form components that covers some common
 // fields of two different forms
-export type PartialFormState<TState, TValidationError> = ConditionalFormField<TState, TValidationError> & {
+export type PartialFormState<TState, TValidationError = string> = ConditionalFormField<TState, TValidationError> & {
   submitting: boolean;
 };
 
 // Legacy name for PartialFormState for backwards compatibility
-export type ReadFormState<TState, TValidationError> = PartialFormState<TState, TValidationError>;
+export type ReadFormState<TState, TValidationError = string> = PartialFormState<TState, TValidationError>;
 
-export type FormState<TState, TValidationError> = PartialFormState<TState, TValidationError> & {
+export type FormState<TState, TValidationError = string> = PartialFormState<TState, TValidationError> & {
   submit: () => Promise<void>;
 };
 
-export interface Validation<TState, TValidationError> {
+export interface Validation<TState, TValidationError = string> {
   onSubmit?: ValidateFunc<TState, TValidationError>;
   onChange?: ValidateFunc<TState, TValidationError>;
 }
 
-export interface ComplexValidation<TState extends {}, TValidationError> extends Validation<TState, TValidationError> {
+export interface ComplexValidation<TState extends {}, TValidationError = string>
+  extends Validation<TState, TValidationError> {
   fields?: ComplexFieldsValidation<TState, TValidationError>;
 }
 
-export interface ArrayValidation<TState extends any[], TValidationError> extends Validation<TState, TValidationError> {
+export interface ArrayValidation<TState extends any[], TValidationError = string>
+  extends Validation<TState, TValidationError> {
   item?: ConditionalValidation<TState[0], TValidationError>;
 }
 
-export interface PrimitiveValidation<TState, TValidationError> extends Validation<TState, TValidationError> {}
+export interface PrimitiveValidation<TState, TValidationError = string> extends Validation<TState, TValidationError> {}
 
-export type ValidateFunc<TValue, TValidationError> = (
+export type ValidateFunc<TValue, TValidationError = string> = (
   val: TValue,
 ) => TValidationError | false | undefined | null | Promise<TValidationError | undefined | false | null>;
 
-export type ConditionalValidation<TState, TValidationError> = TState extends null | undefined
+export type ConditionalValidation<TState, TValidationError = string> = TState extends null | undefined
   ? null
   : [TState] extends [any[]]
   ? ArrayValidation<TState, TValidationError>
@@ -91,7 +95,7 @@ export type ConditionalValidation<TState, TValidationError> = TState extends nul
   ? ComplexValidation<TState, TValidationError>
   : PrimitiveValidation<TState, TValidationError>;
 
-export type ComplexFieldsValidation<TState, TValidationError> =
+export type ComplexFieldsValidation<TState, TValidationError = string> =
   | {
       [P in keyof TState]?: ConditionalValidation<TState[P], TValidationError>;
     }
@@ -226,7 +230,7 @@ function containsError<T>(field: ConditionalFormField<T, any>): boolean {
   return false;
 }
 
-export interface FormOptions<TState, TValidationError> {
+export interface FormOptions<TState, TValidationError = string> {
   onSubmit: SubmitFunc<TState>;
   validation?: ConditionalValidation<TState, TValidationError>;
 }
@@ -548,7 +552,6 @@ function createPrimitiveFormField<TValue>(
   return {
     ...getBasicField(path, setValue, setTouched, initValue),
     type: "primitive",
-    name: pathToString(path),
   };
 }
 
@@ -566,6 +569,7 @@ function getBasicField<T>(
   value: T,
 ): FormField<T, any> {
   return {
+    name: pathToString(path),
     path,
     touched: false,
     error: undefined,
