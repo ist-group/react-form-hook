@@ -288,7 +288,7 @@ export function useForm<TState, TValidationError = string>(
 
           // Submit if no error
           if (!containsError(currentState as any)) {
-            await optionsRef.current!.onSubmit(currentState.value);
+            const res = await optionsRef.current!.onSubmit(currentState.value);
             // "Un-touch" all
             setState(prev => ({
               ...prev,
@@ -297,6 +297,8 @@ export function useForm<TState, TValidationError = string>(
                 touched: false,
               })),
             }));
+
+            return res;
           }
         } finally {
           setState(prev => ({
