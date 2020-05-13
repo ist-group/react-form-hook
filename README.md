@@ -23,7 +23,7 @@ const FormComponent = () => {
       description: "",
     },
     {
-      validation:
+      fieldValidation:
       {
         fields: {
           // This is a validator for a specific field, triggered onchange.
@@ -84,7 +84,7 @@ const FormComponent = () => {
       list: [{type: ""}]
     },
     {
-      validation: {
+      fieldValidation: {
         fields: {
           id: id => (!id ? "Id is an required field" : undefined),
           list: {
@@ -143,7 +143,7 @@ const FormComponent = () => {
       extraInfo: null
     },
     {
-      validation: {
+      fieldValidation: {
         fields: {
           requiredInfo: {
             fields: {
@@ -175,6 +175,64 @@ const FormComponent = () => {
         ? <MyChildrenComponent field={form.fields.extraInfo.fields} />
         : <button onClick={addExtraInfo}>Add Extra Info</button>
       }
+    </form>
+  );
+};
+```
+
+## Advanded validation (form level validation)
+
+In form validation `undefined` and `null` has special meanings. Using `null` explicitly means that there is no error and `undefined` means that an eventual error should be untouched (keep was there).
+
+```tsx
+const MyChildrenComponent = ({ complexField }) => {
+  return (
+    <div>
+      <MyTextComponent field={complexField.foo} />
+      <MyTextComponent field={complexField.bar} />
+      <MyTextComponent field={complexField.baz} />
+    </div>
+  );
+};
+
+const FormComponent = () => {
+  const form = useForm(
+    {
+      id: "",
+      useDescription: false,
+      description: "",
+    },
+    {
+      formValidation: (values) => {
+        return {
+          fields: {
+            description:
+              values.useDescription && !values.description
+                ? "Description is required when 'use description' is checked"
+                : null,
+          },
+        };
+      },
+      onSubmit: (values) => doSomething(values),
+    },
+  );
+
+  const addExtraInfo = (e) => {
+    e.preventDefault();
+    form.value.extraInfo.set({ foo: "", bar: "", baz: "" });
+  };
+
+  return (
+    <form>
+      <MyTextComponent field={form.fields.id} />
+      <MyTextComponent field={form.fields.name} />
+      <MyTextComponent field={form.fields.description} />
+      <MyChildrenComponent field={form.fields.requiredInfo.fields} />
+      {form.fields.extraInfo.fields ? (
+        <MyChildrenComponent field={form.fields.extraInfo.fields} />
+      ) : (
+        <button onClick={addExtraInfo}>Add Extra Info</button>
+      )}
     </form>
   );
 };

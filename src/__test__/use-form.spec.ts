@@ -29,34 +29,34 @@ const initValue = {
 const getBasicFormSetup = (myMock?: jest.Mock<any, any>) =>
   renderHook(() =>
     useForm<FormProps>(initValue, {
-      validation: {
+      fieldValidation: {
         fields: {
           id: {
-            onSubmit: value => !value && "Id is required",
+            onSubmit: (value) => !value && "Id is required",
           },
           list: {
             item: {
               fields: {
                 id: {
-                  onSubmit: value => !value && "Id is required",
+                  onSubmit: (value) => !value && "Id is required",
                 },
               },
-              onSubmit: value => !value.name && !value.description && "Either name or description is required",
+              onSubmit: (value) => !value.name && !value.description && "Either name or description is required",
             },
-            onChange: list => list.length > 10 && "You can max have 10 list",
-            onSubmit: list => list.length === 2 && "Two items is not allowed",
+            onChange: (list) => list.length > 10 && "You can max have 10 list",
+            onSubmit: (list) => list.length === 2 && "Two items is not allowed",
           },
           item: {
             fields: {
               id: {
-                onChange: value => !value && "Id is required",
+                onChange: (value) => !value && "Id is required",
               },
             },
-            onSubmit: value => value && !value.name && !value.description && "Either name or description is required",
+            onSubmit: (value) => value && !value.name && !value.description && "Either name or description is required",
           },
         },
       },
-      onSubmit: value => {
+      onSubmit: (value) => {
         if (myMock) {
           return myMock(value);
         }
@@ -281,8 +281,8 @@ test("validation closure", () => {
   const { result, rerender } = renderHook(
     (props: { validValue: string }) =>
       useForm<string>("", {
-        validation: {
-          onChange: val => (val === props.validValue ? undefined : "ERROR"),
+        fieldValidation: {
+          onChange: (val) => (val === props.validValue ? undefined : "ERROR"),
         },
         onSubmit: () => {},
       }),
@@ -295,4 +295,38 @@ test("validation closure", () => {
   rerender({ validValue: "new correct value" });
   act(() => result.current.set("correct value"));
   expect(result.current.error).toBe("ERROR");
+});
+
+test("form validation", () => {
+  const { result, rerender } = renderHook((props: {}) =>
+    useForm<{ enabled: boolean; description: string; name: string }>(
+      { enabled: false, description: "", name: "" },
+      {
+        fieldValidation: {
+          fields: {
+            name: {
+              onChange: (val) => (!val ? "Name required" : null),
+            },
+          },
+        },
+        formValidation: (values) => ({
+          fields: {
+            description: values.enabled && !values.description ? "description required" : null,
+            name: values.enabled ? undefined : null, // undefined leaves error untouched
+          },
+        }),
+        onSubmit: () => {},
+      },
+    ),
+  );
+
+  act(() => result.current.fields.enabled.set(true));
+  expect(result.current.fields.description.error).toBeTruthy();
+  expect(result.current.fields.name.error).toBeFalsy(); // field validation not yet run
+  act(() => result.current.fields.name.set(""));
+  expect(result.current.fields.name.error).toBeTruthy(); // field validation has now run
+
+  act(() => result.current.fields.enabled.set(false));
+  expect(result.current.fields.description.error).toBeFalsy();
+  expect(result.current.fields.name.error).toBeFalsy(); // form validation result null should override field validation error
 });
